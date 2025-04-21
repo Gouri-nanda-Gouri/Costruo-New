@@ -62,7 +62,7 @@ class CustomFilePicker {
       final File fileToUpload = File(file.path!);
       
       // Upload the file to Supabase storage
-      final response = await supabase
+      await supabase
           .storage
           .from(bucketName)
           .upload(filePath, fileToUpload);

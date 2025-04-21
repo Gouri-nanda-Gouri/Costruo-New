@@ -1,7 +1,6 @@
 import 'package:costruo_worker/home.dart';
 import 'package:costruo_worker/main.dart';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Login extends StatefulWidget {
   const Login({super.key});
@@ -16,34 +15,35 @@ class _LoginState extends State<Login> {
   bool password = true;
 
   Future<void> signIn() async {
-  try {
-    final response = await supabase
-        .from('tbl_worker') // Query the workers table directly
-        .select('worker_email, worker_password') // Fetch email and password
-        .eq('worker_email', emailController.text.trim()) // Match email
-        .maybeSingle(); // Get a single result or null
+    try {
+      // First authenticate with Supabase Auth
+      final authResponse = await supabase.auth.signInWithPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      );
 
-    if (response == null) {
-      showError("Worker not found.");
-      return;
-    }
+      if (authResponse.session == null) {
+        showError("Authentication failed");
+        return;
+      }
 
-    final storedPassword = response['worker_password'];
+      // Then fetch worker details
+      final workerResponse = await supabase
+          .from('tbl_worker')
+          .select()
+          .eq('worker_email', emailController.text.trim())
+          .single();
 
-    if (storedPassword == passwordController.text.trim()) {
-      print("Worker login successful: ${response['worker_email']}");
+      print("Worker login successful: ${workerResponse['worker_email']}");
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => WorkerHomePage()),
+        MaterialPageRoute(builder: (context) => const WorkerHomePage()),
       );
-    } else {
-      showError("Invalid credentials.");
+        } catch (e) {
+      print("Login error: $e");
+      showError("Invalid credentials");
     }
-  } catch (e) {
-    print("Login error: $e");
-    showError("An error occurred while logging in.");
   }
-}
 
 
   void showError(String message) {

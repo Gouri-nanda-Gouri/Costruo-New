@@ -2,7 +2,6 @@ import 'package:costruo_contractor/enquiries.dart';
 import 'package:costruo_contractor/main.dart' as main_supabase;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'work_quote_detail_page.dart'; // Import the detail page
 
 class WorkQuotesPage extends StatefulWidget {
   const WorkQuotesPage({super.key});
@@ -40,8 +39,9 @@ class _WorkQuotesPageState extends State<WorkQuotesPage> {
       
       final response = await main_supabase.supabase
           .from('tbl_workquote')
-          .select('enquiry_id, workquote_budget, workquote_days, workquote_file, work_remark, created_at')
+          .select()
           .eq('contractor_id', contractorId)
+          .neq('work_remark', 10)
           .order('created_at', ascending: false);
 
       if (mounted) {
@@ -181,11 +181,11 @@ class _WorkQuotesPageState extends State<WorkQuotesPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
             color: cardShadowColor,
             blurRadius: 8,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -218,7 +218,7 @@ class _WorkQuotesPageState extends State<WorkQuotesPage> {
                         ),
                         child: Text(
                           'Enquiry #${quote['enquiry_id']}',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: primaryColor,

@@ -29,11 +29,6 @@ class _EnquiriesPageState extends State<EnquiriesPage> {
           .from('tbl_enquiry')
           .select('*, tbl_user(user_name)');
 
-      if (data == null) {
-        _showErrorSnackBar("No data returned from server");
-        return;
-      }
-
       setState(() {
         enquiries = (data as List<dynamic>)
             .map((e) => e as Map<String, dynamic>)

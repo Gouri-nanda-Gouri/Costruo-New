@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:costruo_user/enquery.dart';
 import 'package:costruo_user/main.dart' as main_supabase;
 import 'package:costruo_user/profile.dart';
 import 'package:costruo_user/search.dart';
@@ -169,13 +170,10 @@ class _HomeState extends State<Home> {
       );
 
     case 1:
-      return  Search();
+      return  const Search();
 
     case 2:
-      return const Center(
-        child: Text("Projects Page",
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-      );
+      return const EnquiriesPage();
 
     case 3:
       return const Profile();

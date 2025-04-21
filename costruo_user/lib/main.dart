@@ -1,3 +1,4 @@
+import 'package:costruo_user/home.dart';
 import 'package:costruo_user/login.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -17,7 +18,25 @@ class MainApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const MaterialApp(
-      home: Login()
+      debugShowCheckedModeBanner: false,
+      home: AuthWrapper()
     );
+  }
+}
+
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // Check if the user is logged in
+    final session = supabase.auth.currentSession;
+
+    // Navigate to the appropriate screen based on the authentication state
+    if (session != null) {
+      return const Home(); // Replace with your home screen widget
+    } else {
+      return const Login(); // Replace with your auth page widget
+    }
   }
 }

@@ -1,4 +1,4 @@
-import 'package:costruo_contractor/homepage.dart';
+import 'package:costruo_contractor/dashboard.dart';
 import 'package:costruo_contractor/main.dart' as main_supabase;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
