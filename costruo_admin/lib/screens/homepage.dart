@@ -6,6 +6,7 @@ import 'package:costruo_admin/screens/dashbord.dart';
 import 'package:costruo_admin/screens/district.dart';
 import 'package:costruo_admin/screens/place.dart';
 import 'package:costruo_admin/screens/type.dart';
+import 'package:costruo_admin/screens/viewcomplaint.dart';
 import 'package:flutter/material.dart';
 
 class Homepage extends StatefulWidget {
@@ -24,6 +25,7 @@ class _HomepageState extends State<Homepage> {
     Category(),
     Types(),
     Contractor(),
+    ViewComplaintsAdminPage(),
   ];
 
   void onSidebarItemTapped(int index) {

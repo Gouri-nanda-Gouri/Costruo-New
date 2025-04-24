@@ -87,9 +87,9 @@ class _HomeState extends State<Home> {
                       children: [
                         Expanded(
                           flex: 2,
-                          child: Text(
+                          child: const Text(
                             "BUILD BEYOND LIMITS",
-                            style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.black, fontFamily: 'serif'),
+                            style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.black, fontFamily: 'serif'),
                           ).animate().fadeIn(duration: 600.ms).slideX(begin: -0.3),
                         ),
                         Container(
@@ -124,9 +124,9 @@ class _HomeState extends State<Home> {
                         const SizedBox(width: 150),
                         Expanded(
                           flex: 3,
-                          child: Text(
+                          child: const Text(
                             "BUILD BEYOND LIMITS",
-                            style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.black, fontFamily: 'serif'),
+                            style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.black, fontFamily: 'serif'),
                           ).animate().fadeIn(duration: 1000.ms).slideX(begin: 0.5),
                         ),
                       ],

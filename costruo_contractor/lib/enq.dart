@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:costruo_contractor/main.dart' as main_supabase;
+import 'package:costruo_contractor/main.dart' ;
 
 // Assuming Agreement page is in a separate file or defined elsewhere
 // If not, you can add the Agreement class here (as provided earlier)
@@ -25,9 +25,11 @@ class _EnquiriesPageState extends State<EnquiriesPage> {
 
   Future<void> fetchEnquiries() async {
     try {
-      final data = await main_supabase.supabase
+      final data = await supabase
           .from('tbl_enquiry')
-          .select('*, tbl_user(user_name)');
+          .select('*, tbl_work!inner("*"),tbl_user!inner(user_name)').eq("tbl_work.contractor_id", supabase.auth.currentUser!.id);
+
+          print("eq:$data");
 
       setState(() {
         enquiries = (data as List<dynamic>)
@@ -224,7 +226,7 @@ class EnquiryDetailPage extends StatelessWidget {
         if (visitingDate != null) 'visiting_date': visitingDate.toIso8601String(),
       };
 
-      final response = await main_supabase.supabase
+      final response = await supabase
           .from('tbl_enquiry')
           .update(updateData)
           .match({'id': enquiry['id']});
@@ -257,7 +259,7 @@ class EnquiryDetailPage extends StatelessWidget {
       }
 
       print("Updating enquiry with ID: ${enquiry['id']} to status 0");
-      final response = await main_supabase.supabase
+      final response = await supabase
           .from('tbl_enquiry')
           .update({'enquiry_status': 0})
           .match({'id': enquiry['id']});

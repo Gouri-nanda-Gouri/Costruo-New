@@ -38,7 +38,7 @@ class _MyworkState extends State<Mywork> {
     final data = await supabase
         .from('tbl_work')
         .select()
-        .eq('contractor_id', user.id); // Filter work by logged-in contractor
+        .eq('contractor_id', user.id).eq("work_status", 0); // Filter work by logged-in contractor
 
     setState(() {
       wData = data;

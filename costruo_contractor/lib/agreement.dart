@@ -159,7 +159,7 @@ class AgreementState extends State<Agreement> {
 
   Future<String?> proofUpload() async {
     try {
-      final bucketName = 'agreement';
+      const bucketName = 'agreement';
       final filePath =
           "${DateTime.now().millisecondsSinceEpoch.toString()}-${pickedPdf!.name}";
       await main_supabase.supabase.storage.from(bucketName).uploadBinary(
@@ -194,7 +194,7 @@ class AgreementState extends State<Agreement> {
       setState(() {
         _errorMessage = "Error saving data: $e";
       });
-      throw e;
+      rethrow;
     }
   }
 
@@ -244,7 +244,7 @@ class AgreementState extends State<Agreement> {
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => Homepage()),
+        MaterialPageRoute(builder: (context) => const Homepage()),
       );
     } catch (e) {
       print("Error submitting form: $e");

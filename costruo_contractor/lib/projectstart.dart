@@ -92,7 +92,7 @@ class ProjectStartPage extends StatelessWidget {
                     // Navigate back to Homepage
                     Navigator.pushReplacement(
                       context,
-                      MaterialPageRoute(builder: (context) => Homepage()),
+                      MaterialPageRoute(builder: (context) => const Homepage()),
                     );
                   },
                   icon: const Icon(Icons.home, size: 20),

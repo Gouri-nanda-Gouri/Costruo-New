@@ -13,7 +13,7 @@ class WorkDetailPage extends StatefulWidget {
   final String budget;
   final String loctn;
   final int workId;
-  final Map<String,dynamic> contractor;
+  final Map<String, dynamic> contractor;
 
   const WorkDetailPage({
     super.key,
@@ -22,7 +22,8 @@ class WorkDetailPage extends StatefulWidget {
     required this.description,
     required this.budget,
     required this.loctn,
-    required this.workId, required this.contractor,
+    required this.workId,
+    required this.contractor,
   });
 
   @override
@@ -35,6 +36,7 @@ class _WorkDetailPageState extends State<WorkDetailPage> {
   String _selectedDist = "";
   String _selectedPlc = "";
   bool isLoading = false; // Add loading state
+  double? contractorRating; // Store the contractor's average rating
 
   TextEditingController detailsController = TextEditingController();
   TextEditingController locationController = TextEditingController();
@@ -47,8 +49,8 @@ class _WorkDetailPageState extends State<WorkDetailPage> {
   void initState() {
     super.initState();
     fetchdistrict();
+    fetchContractorRating(); // Fetch rating on initialization
   }
-  
 
   Future<void> fetchdistrict() async {
     try {
@@ -70,7 +72,7 @@ class _WorkDetailPageState extends State<WorkDetailPage> {
           .from("tbl_place")
           .select()
           .eq('district_id', districtId);
-          print(data);
+      print(data);
       setState(() {
         placelist = List<Map<String, dynamic>>.from(data);
       });
@@ -79,6 +81,35 @@ class _WorkDetailPageState extends State<WorkDetailPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error fetching places: $e')),
       );
+    }
+  }
+
+  Future<void> fetchContractorRating() async {
+    try {
+      final response = await supabase
+          .from('tbl_rating')
+          .select('rating_value')
+          .eq('contractor_id', widget.contractor['id'])
+          .limit(1); // Fetch all ratings for the contractor
+
+      if (response.isNotEmpty) {
+        final ratings = response.map((r) => r['rating_value'] as num).toList();
+        final averageRating = ratings.isNotEmpty
+            ? ratings.reduce((a, b) => a + b) / ratings.length
+            : 0.0;
+        setState(() {
+          contractorRating = double.parse(averageRating.toStringAsFixed(1));
+        });
+      } else {
+        setState(() {
+          contractorRating = 0.0;
+        });
+      }
+    } catch (e) {
+      print("Error fetching contractor rating: $e");
+      setState(() {
+        contractorRating = 0.0; // Default to 0 if there's an error
+      });
     }
   }
 
@@ -189,7 +220,6 @@ class _WorkDetailPageState extends State<WorkDetailPage> {
       });
     }
   }
-  
 
   void _showEnquiryDialog(BuildContext context) {
     showDialog(
@@ -373,7 +403,7 @@ class _WorkDetailPageState extends State<WorkDetailPage> {
               const SizedBox(height: 16),
               Text(
                 widget.title,
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Row(
@@ -387,14 +417,39 @@ class _WorkDetailPageState extends State<WorkDetailPage> {
                 ],
               ),
               const SizedBox(height: 8),
+              if (contractorRating != null) ...[
+                Row(
+                  children: [
+                    const Icon(Icons.star, size: 20, color: Colors.amber),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Rating: ${contractorRating}',
+                      style: const TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                    const SizedBox(width: 8),
+                    // Display stars based on rating
+                    Row(
+                      children: List.generate(5, (index) {
+                        final starValue = index + 1;
+                        return Icon(
+                          starValue <= contractorRating!
+                              ? Icons.star
+                              : (starValue - 0.5 <= contractorRating! ? Icons.star_half : Icons.star_border),
+                          color: Colors.amber,
+                          size: 20,
+                        );
+                      }),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
               Text(widget.description, style: const TextStyle(fontSize: 16)),
               const SizedBox(height: 8),
               Text('Budget: ${widget.budget}', style: const TextStyle(fontSize: 16)),
               const SizedBox(height: 8),
               Text('Location: ${widget.loctn}', style: const TextStyle(fontSize: 16)),
-              const SizedBox(
-                height: 10,
-              ),
+              const SizedBox(height: 10),
               Align(
                 alignment: Alignment.centerRight,
                 child: ElevatedButton(

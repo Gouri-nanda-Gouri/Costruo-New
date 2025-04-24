@@ -63,7 +63,7 @@ class _RegistrationState extends State<Registration> {
 
   Future<String?> photoUpload(String uid) async {
     try {
-      final bucketName = 'contractor'; // Replace with your bucket name
+      const bucketName = 'contractor'; // Replace with your bucket name
       final filePath = "$uid-${pickedImage!.name}";
       await supabase.storage.from(bucketName).uploadBinary(
             filePath,
@@ -81,7 +81,7 @@ class _RegistrationState extends State<Registration> {
 
   Future<String?> proofUpload(String uid) async {
     try {
-      final bucketName = 'contractor'; // Replace with your bucket name
+      const bucketName = 'contractor'; // Replace with your bucket name
       final filePath = "$uid-${pickedProof!.name}";
       await supabase.storage.from(bucketName).uploadBinary(
             filePath,

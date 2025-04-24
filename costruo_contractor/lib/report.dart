@@ -1,6 +1,6 @@
 import 'package:costruo_contractor/main.dart';
 import 'package:flutter/material.dart';
-import 'package:costruo_contractor/main.dart' as main_supabase;
+import 'package:costruo_contractor/main.dart' ;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -60,29 +60,19 @@ class _ReportState extends State<Report> {
     setState(() => isLoading = true);
 
     try {
-      final response = await main_supabase.supabase
+      final response = await supabase
           .from('tbl_workquote')
-          .select('''
-            *,
-            tbl_enquiry (
-              enquiry_detail,
-              user_id
-            ),
-            tbl_payment (
-              payment_amount,
-              payment_status,
-              created_at
-            )
-          ''')
+          .select('*, tbl_enquiry(*), tbl_payment(*)')
           .gte('created_at', startDate!.toIso8601String())
           .lte('created_at', endDate!.toIso8601String())
           .eq('contractor_id', supabase.auth.currentUser!.id);
-
+  print(response);
       setState(() {
         reportData = List<Map<String, dynamic>>.from(response);
         isLoading = false;
       });
     } catch (e) {
+      print(e);
       setState(() => isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error generating report: $e')),
@@ -173,7 +163,7 @@ class _ReportState extends State<Report> {
   pw.Widget _buildPDFSummaryItem(String label, String value) {
     return pw.Column(
       children: [
-        pw.Text(label, style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+        pw.Text(label, style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
         pw.SizedBox(height: 4),
         pw.Text(value, style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
       ],

@@ -8,13 +8,15 @@ class ProjectGrid extends StatelessWidget {
     {"title": "Eco-Friendly Home", "image": "assets/project4.jpg"},
   ];
 
+   ProjectGrid({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
+        const Padding(
+          padding: EdgeInsets.all(16.0),
           child: Text(
             "// Projects",
             style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
@@ -24,9 +26,9 @@ class ProjectGrid extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: GridView.builder(
             shrinkWrap: true,
-            physics: NeverScrollableScrollPhysics(),
+            physics: const NeverScrollableScrollPhysics(),
             itemCount: projects.length,
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2, // Adjust for responsiveness
               crossAxisSpacing: 7,
               mainAxisSpacing: 7,
@@ -42,7 +44,7 @@ class ProjectGrid extends StatelessWidget {
                   children: [
                     Expanded(
                       child: ClipRRect(
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(10)),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
                         child: Image.asset(
                           projects[index]['image']!,
                           width: double.infinity,
@@ -54,7 +56,7 @@ class ProjectGrid extends StatelessWidget {
                       padding: const EdgeInsets.all(8.0),
                       child: Text(
                         projects[index]['title']!,
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],

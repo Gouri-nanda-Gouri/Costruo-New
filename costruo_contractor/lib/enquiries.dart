@@ -201,56 +201,102 @@ class _WorkQuoteDetailPageState extends State<WorkQuoteDetailPage> {
   }
 
   Future<void> _completeProject(BuildContext context) async {
-    try {
-      bool confirm = await showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text('Complete Project'),
-            content: const Text(
-              'Are you sure you want to mark this project as complete?\n\nThis action cannot be undone.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                ),
-                child: const Text('Complete Project'),
-              ),
-            ],
-          );
-        },
-      );
-
-      if (confirm == true) {
-        await supabase
-            .from('tbl_workquote')
-            .update({'work_remark': '10'})
-            .eq('workquote_id', widget.quote['workquote_id']);
-        await supabase.from('tbl_assign').update({'assign_status': 1}).eq('workquote_id', widget.quote['workquote_id']);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Project marked as complete!'),
-            backgroundColor: Colors.green,
+  try {
+    // Show confirmation dialog
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Complete Project'),
+          content: const Text(
+            'Are you sure you want to mark this project as complete?\n\nThis action cannot be undone.',
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+              ),
+              child: const Text('Complete Project'),
+            ),
+          ],
         );
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      print("Error completing project: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error completing project: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      },
+    );
+
+    if (confirm != true) {
+      return; // Exit if user cancels
     }
+
+    // Fetch work_id from tbl_work via tbl_enquiry
+    final workResponse = await supabase
+        .from('tbl_workquote')
+        .select('tbl_enquiry!inner(*, tbl_work!inner(work_id))')
+        .eq('workquote_id', widget.quote['workquote_id'])
+        .maybeSingle();
+
+    if (workResponse == null) {
+      throw Exception('No workquote found for workquote_id: ${widget.quote['workquote_id']}');
+    }
+
+    final workId = workResponse['tbl_enquiry']?['tbl_work']?['work_id'] as int?;
+    if (workId == null) {
+      throw Exception('Work ID not found in enquiry or work data');
+    }
+    print('Work ID: $workId');
+
+    final enqid = workResponse['tbl_enquiry']?['enquiry_id'] as int?;
+    if (enqid == null) {
+      throw Exception('Work ID not found in enquiry or work data');
+    }
+    print('Enq ID: $enqid');
+
+    // Perform updates
+    await Future.wait([
+      supabase
+          .from('tbl_workquote')
+          .update({'work_remark': '10'})
+          .eq('workquote_id', widget.quote['workquote_id']),
+      supabase
+          .from('tbl_assign')
+          .update({'assign_status': 1})
+          .eq('workquote_id', widget.quote['workquote_id']),
+      supabase
+          .from('tbl_work')
+          .update({'work_status': 1})
+          .eq('work_id', workId),
+
+        supabase
+          .from('tbl_enquiry')
+          .update({'enquiry_status': 5})
+          .eq('enquiry_id', enqid),
+    ]);
+
+    // Show success message
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Project marked as complete!'),
+        backgroundColor: Colors.green,
+      ),
+    );
+
+    // Navigate back
+    Navigator.pop(context);
+  } catch (e, stacktrace) {
+    print('Error completing project: $e');
+    print(stacktrace);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Error completing project: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
+}
 
   List<Map<String, dynamic>> workers = [];
 

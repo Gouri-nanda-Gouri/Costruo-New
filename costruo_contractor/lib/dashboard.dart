@@ -1,8 +1,10 @@
-import 'package:costruo_contractor/completed_projects.dart';
+import 'package:costruo_contractor/completed.dart';
 import 'package:costruo_contractor/enq.dart';
 import 'package:costruo_contractor/login.dart';
 import 'package:costruo_contractor/main.dart';
+import 'package:costruo_contractor/mywork.dart';
 import 'package:costruo_contractor/ongoing.dart';
+import 'package:costruo_contractor/report.dart';
 import 'package:costruo_contractor/workers.dart';
 import 'package:flutter/material.dart';
 
@@ -182,7 +184,7 @@ class HomepageState extends State<Homepage> {
 
   Future<void> fetchData() async {
     try {
-      final data = await supabase.from('tbl_contractor').select().eq('id', supabase.auth.currentUser!.id).single;
+      final data = supabase.from('tbl_contractor').select().eq('id', supabase.auth.currentUser!.id).single;
       setState(() {
         cData = data as List<Map<String, dynamic>>;
       });
@@ -276,11 +278,19 @@ class HomepageState extends State<Homepage> {
                   child: Icon(Icons.check_circle, size: 20),
                 ),
                 title: const Text('Completed'),
-                onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const CompletedProjects()));
+               onTap: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const CompletedWork()));
                 },
               ),
             ],
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.people),
+            title: const Text('My Works'),
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const Mywork(),));
+            },
           ),
           const Divider(),
           ListTile(
@@ -294,7 +304,9 @@ class HomepageState extends State<Homepage> {
           ListTile(
             leading: const Icon(Icons.analytics),
             title: const Text('Reports'),
-            onTap: () {},
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const Report(),));
+            },
           ),
           // const Divider(),
           // ListTile(

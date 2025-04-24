@@ -15,7 +15,8 @@ class _MySideBarState extends State<MySideBar> {
     "Place",
     "Category",
     "Type",
-    "Contractors"
+    "Contractors",
+    "View Complaints",
 
   ];
 
@@ -26,6 +27,7 @@ class _MySideBarState extends State<MySideBar> {
     Icons.dashboard_customize_outlined,
      Icons.dashboard_customize_outlined,
      Icons.person_add_alt_1_outlined,
+     Icons.view_list_outlined,
   ];
 
   @override

@@ -54,7 +54,8 @@ class _QuoteSummaryPageState extends State<QuoteSummaryPage> {
     try {
       final data = await main_supabase.supabase
           .from('tbl_workquote')
-          .select('workquote_id, workquote_file, workquote_drawing, workquote_budget, workquote_days, work_remark, tbl_enquiry(*)')
+          .select(
+              'workquote_id, workquote_file, workquote_drawing, workquote_budget, workquote_days, work_remark, tbl_enquiry(*)')
           .eq('workquote_id', widget.qid)
           .maybeSingle();
 
@@ -66,6 +67,8 @@ class _QuoteSummaryPageState extends State<QuoteSummaryPage> {
             days = data['workquote_days']?.toString() ?? 'Not specified';
             budget = data['workquote_budget']?.toString() ?? 'Not specified';
             workRemark = data['work_remark']?.toString() ?? '';
+            print("Fetched WorkRemart: $workRemark");
+
             errorMessage = '';
           } else {
             errorMessage = 'No quote data available';
@@ -111,7 +114,9 @@ class _QuoteSummaryPageState extends State<QuoteSummaryPage> {
       await main_supabase.supabase
           .from('tbl_workquote')
           .update({'work_remark': '4'}).eq('workquote_id', widget.qid);
-      await supabase.from('tbl_enquiry').update({'enquiry_status': 4}).eq('id', widget.eid);
+      await supabase
+          .from('tbl_enquiry')
+          .update({'enquiry_status': 4}).eq('id', widget.eid);
       if (mounted) {
         setState(() {
           workRemark = '4'; // Update local status
@@ -205,8 +210,7 @@ class _QuoteSummaryPageState extends State<QuoteSummaryPage> {
     try {
       await main_supabase.supabase
           .from('tbl_workquote')
-          .update({'work_remark': '7'})
-          .eq('workquote_id', widget.qid);
+          .update({'work_remark': '7'}).eq('workquote_id', widget.qid);
       if (mounted) {
         setState(() {
           workRemark = '7';
@@ -246,14 +250,11 @@ class _QuoteSummaryPageState extends State<QuoteSummaryPage> {
 
     if (result == true && reasonController.text.isNotEmpty) {
       try {
-        await main_supabase.supabase
-            .from('tbl_workquote')
-            .update({
-              'work_remark': '8',
-              'refresh_reason': reasonController.text,
-            })
-            .eq('workquote_id', widget.qid);
-        
+        await main_supabase.supabase.from('tbl_workquote').update({
+          'work_remark': '8',
+          'refresh_reason': reasonController.text,
+        }).eq('workquote_id', widget.qid);
+
         if (mounted) {
           setState(() => workRemark = '8');
           ScaffoldMessenger.of(context).showSnackBar(
@@ -298,7 +299,8 @@ class _QuoteSummaryPageState extends State<QuoteSummaryPage> {
                         padding: const EdgeInsets.all(16.0),
                         child: Text(
                           errorMessage,
-                          style: const TextStyle(color: Colors.red, fontSize: 16),
+                          style:
+                              const TextStyle(color: Colors.red, fontSize: 16),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -384,8 +386,8 @@ class _QuoteSummaryPageState extends State<QuoteSummaryPage> {
                           const SizedBox(height: 8),
                           Text('Estimated Days: $days',
                               style: const TextStyle(fontSize: 18)),
-                          if (workRemark != 4) ...[
-                            // Only show buttons if not accepted
+                          if (workRemark != '4' && workRemark != '5') ...[
+                            // Show all options if workRemark is not 4 or 5
                             const SizedBox(height: 20),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -425,31 +427,35 @@ class _QuoteSummaryPageState extends State<QuoteSummaryPage> {
                                 ),
                               ],
                             ),
-                          ],
+                          ] 
+                          
                         ],
                       ),
                     ),
-                    if (workRemark == '6') Column(
-                      children: [
-                        const Text("Drawing Submitted - Pending Review",
-                            style: TextStyle(color: Colors.orange)),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            ElevatedButton(
-                              onPressed: acceptDrawing,
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                              child: const Text('Accept Drawing'),
-                            ),
-                            ElevatedButton(
-                              onPressed: requestDrawingRevision,
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                              child: const Text('Request Revision'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                    if (workRemark == '6')
+                      Column(
+                        children: [
+                          const Text("Drawing Submitted - Pending Review",
+                              style: TextStyle(color: Colors.orange)),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              ElevatedButton(
+                                onPressed: acceptDrawing,
+                                style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green),
+                                child: const Text('Accept Drawing'),
+                              ),
+                              ElevatedButton(
+                                onPressed: requestDrawingRevision,
+                                style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.orange),
+                                child: const Text('Request Revision'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     if (workRemark == '7')
                       const Text("Drawing Approved",
                           style: TextStyle(color: Colors.green)),

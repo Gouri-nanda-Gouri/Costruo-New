@@ -1,8 +1,14 @@
-
 import 'package:costruo_contractor/main.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
+import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
+import 'dart:convert';
+
+import 'package:flutter/services.dart';
+import 'dart:convert';
 
 class ManageWorkers extends StatefulWidget {
   const ManageWorkers({super.key});
@@ -14,6 +20,7 @@ class ManageWorkers extends StatefulWidget {
 class _ManageWorkersState extends State<ManageWorkers> {
   List<Map<String, dynamic>> workers = [];
   List<Map<String, dynamic>> typelist = [];
+  List<Map<String, dynamic>> salaryRecords = [];
   bool isLoading = true;
   String? errorMessage;
   String searchQuery = '';
@@ -23,9 +30,9 @@ class _ManageWorkersState extends State<ManageWorkers> {
     super.initState();
     fetchWorkers();
     fetchTypes();
+    fetchSalaryRecords();
   }
 
-  // Fetch workers from Supabase
   Future<void> fetchWorkers() async {
     try {
       setState(() {
@@ -58,7 +65,6 @@ class _ManageWorkersState extends State<ManageWorkers> {
     }
   }
 
-  // Fetch skill types for dropdown
   Future<void> fetchTypes() async {
     try {
       final response = await supabase.from("tbl_type").select();
@@ -70,7 +76,31 @@ class _ManageWorkersState extends State<ManageWorkers> {
     }
   }
 
-  // Delete a worker
+  Future<void> fetchSalaryRecords() async {
+    try {
+      final now = DateTime.now();
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0);
+
+      final response = await supabase
+          .from('tbl_salary')
+          .select('worker_id, salary_date, salary_amount, salary_status')
+          .gte('salary_date', startOfMonth.toIso8601String())
+          .lte('salary_date', endOfMonth.toIso8601String());
+
+      setState(() {
+        salaryRecords = List<Map<String, dynamic>>.from(response);
+      });
+    } catch (e) {
+      print('Error fetching salary records: $e');
+    }
+  }
+
+  bool hasBeenPaidThisMonth(String workerId) {
+    return salaryRecords.any((record) =>
+        record['worker_id'] == workerId && record['salary_status'] == 1);
+  }
+
   Future<void> deleteWorker(String workerId, String? photoUrl) async {
     try {
       final shouldDelete = await showDialog<bool>(
@@ -113,7 +143,20 @@ class _ManageWorkersState extends State<ManageWorkers> {
     }
   }
 
-  // Show registration dialog
+  void showPaymentDialog(String workerId, String workerName) {
+    showDialog(
+      context: context,
+      builder: (context) => SalaryPaymentDialog(
+        workerId: workerId,
+        workerName: workerName,
+        onPaymentSuccess: () async {
+          await fetchSalaryRecords();
+          setState(() {});
+        },
+      ),
+    );
+  }
+
   void showRegistrationDialog() {
     showDialog(
       context: context,
@@ -134,7 +177,7 @@ class _ManageWorkersState extends State<ManageWorkers> {
         title: const Text(
           'Manage Workers',
           style: TextStyle(
-            color: Color(0xFF333333), 
+            color: Color(0xFF333333),
             fontWeight: FontWeight.bold,
             fontSize: 24,
           ),
@@ -156,7 +199,10 @@ class _ManageWorkersState extends State<ManageWorkers> {
             padding: const EdgeInsets.only(right: 16.0),
             child: IconButton(
               icon: const Icon(Icons.refresh, color: Colors.blue, size: 28),
-              onPressed: fetchWorkers,
+              onPressed: () async {
+                await fetchWorkers();
+                await fetchSalaryRecords();
+              },
               tooltip: 'Refresh',
             ),
           ),
@@ -164,9 +210,8 @@ class _ManageWorkersState extends State<ManageWorkers> {
       ),
       body: Column(
         children: [
-          // Search Bar
           Container(
-            width: MediaQuery.of(context).size.width * 0.3, // 30% of screen width
+            width: MediaQuery.of(context).size.width * 0.3,
             padding: const EdgeInsets.all(16.0),
             child: TextField(
               onChanged: (value) {
@@ -190,8 +235,6 @@ class _ManageWorkersState extends State<ManageWorkers> {
               ),
             ),
           ),
-
-          // Workers Grid
           Expanded(
             child: _buildWorkersList(),
           ),
@@ -231,8 +274,8 @@ class _ManageWorkersState extends State<ManageWorkers> {
       final name = worker['worker_name']?.toString().toLowerCase() ?? '';
       final email = worker['worker_email']?.toString().toLowerCase() ?? '';
       final type = worker['tbl_type']?['type_name']?.toString().toLowerCase() ?? '';
-      return name.contains(searchQuery) || 
-             email.contains(searchQuery) || 
+      return name.contains(searchQuery) ||
+             email.contains(searchQuery) ||
              type.contains(searchQuery);
     }).toList();
 
@@ -269,6 +312,8 @@ class _ManageWorkersState extends State<ManageWorkers> {
   }
 
   Widget _buildWorkerCard(Map<String, dynamic> worker) {
+    final bool canPaySalary = !hasBeenPaidThisMonth(worker['id']);
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -302,21 +347,30 @@ class _ManageWorkersState extends State<ManageWorkers> {
                       icon: const Icon(Icons.more_vert, size: 20),
                       itemBuilder: (context) => [
                         PopupMenuItem(
-                          child: ListTile(
-                            leading: const Icon(Icons.edit, color: Colors.blue, size: 20),
-                            title: const Text('Edit', style: TextStyle(fontSize: 14)),
+                          child: const ListTile(
+                            leading: Icon(Icons.edit, color: Colors.blue, size: 20),
+                            title: Text('Edit', style: TextStyle(fontSize: 14)),
                             contentPadding: EdgeInsets.zero,
                           ),
                           onTap: () => _editWorker(worker),
                         ),
                         PopupMenuItem(
-                          child: ListTile(
-                            leading: const Icon(Icons.delete, color: Colors.red, size: 20),
-                            title: const Text('Delete', style: TextStyle(fontSize: 14)),
+                          child: const ListTile(
+                            leading: Icon(Icons.delete, color: Colors.red, size: 20),
+                            title: Text('Delete', style: TextStyle(fontSize: 14)),
                             contentPadding: EdgeInsets.zero,
                           ),
                           onTap: () => deleteWorker(worker['id'], worker['worker_photo']),
                         ),
+                        if (canPaySalary)
+                          PopupMenuItem(
+                            child: const ListTile(
+                              leading: Icon(Icons.payment, color: Colors.green, size: 20),
+                              title: Text('Pay Salary', style: TextStyle(fontSize: 14)),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            onTap: () => showPaymentDialog(worker['id'], worker['worker_name']),
+                          ),
                       ],
                     ),
                   ),
@@ -449,11 +503,653 @@ class _ManageWorkersState extends State<ManageWorkers> {
 
   void _editWorker(Map<String, dynamic> worker) {
     // Implement edit worker functionality
-    // You can reuse the RegistrationDialog with modifications
   }
 }
 
-// Registration Dialog Widget
+class SalaryPaymentDialog extends StatefulWidget {
+  final String workerId;
+  final String workerName;
+  final VoidCallback onPaymentSuccess;
+
+  const SalaryPaymentDialog({
+    super.key,
+    required this.workerId,
+    required this.workerName,
+    required this.onPaymentSuccess,
+  });
+
+  @override
+  State<SalaryPaymentDialog> createState() => _SalaryPaymentDialogState();
+}
+
+class _SalaryPaymentDialogState extends State<SalaryPaymentDialog> {
+  TextEditingController amountController = TextEditingController();
+  bool isPaying = false;
+
+  void navigateToPaymentGateway() {
+    final amountText = amountController.text;
+    if (amountText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter the salary amount")),
+      );
+      return;
+    }
+
+    final amount = int.tryParse(amountText);
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a valid salary amount")),
+      );
+      return;
+    }
+
+    Navigator.of(context).pop(); // Close the dialog
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PaymentGatewayScreen(
+          workerId: widget.workerId,
+          workerName: widget.workerName,
+          amount: amount,
+          onPaymentSuccess: widget.onPaymentSuccess,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFFF5F5F5),
+      title: Text(
+        'Pay Salary to ${widget.workerName}',
+        style: const TextStyle(color: Color(0xFF333333), fontFamily: 'serif'),
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: amountController,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(color: Color(0xFF333333)),
+              decoration: InputDecoration(
+                label: const Text("Salary Amount"),
+                labelStyle: const TextStyle(color: Color(0xFF666666)),
+                filled: true,
+                fillColor: const Color(0xFFE8ECEF),
+                prefixIcon: const Icon(Icons.money, color: Color(0xFF333333)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                floatingLabelBehavior: FloatingLabelBehavior.auto,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Payment for ${DateFormat('MMMM yyyy').format(DateTime.now())}',
+              style: const TextStyle(color: Color(0xFF666666)),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel', style: TextStyle(color: Color(0xFF666666))),
+        ),
+        ElevatedButton(
+          onPressed: isPaying ? null : navigateToPaymentGateway,
+          style: ElevatedButton.styleFrom(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            backgroundColor: const Color(0xFF007BFF),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+          ),
+          child: isPaying
+              ? const CircularProgressIndicator(color: Colors.white)
+              : const Text(
+                  "Proceed to Payment",
+                  style: TextStyle(fontSize: 16, fontFamily: 'serif'),
+                ),
+        ),
+      ],
+    );
+  }
+}
+class PaymentGatewayScreen extends StatefulWidget {
+  final String workerId;
+  final String workerName;
+  final int amount;
+  final VoidCallback onPaymentSuccess;
+
+  const PaymentGatewayScreen({
+    Key? key,
+    required this.workerId,
+    required this.workerName,
+    required this.amount,
+    required this.onPaymentSuccess,
+  }) : super(key: key);
+
+  @override
+  _PaymentGatewayScreenState createState() => _PaymentGatewayScreenState();
+}
+
+class _PaymentGatewayScreenState extends State<PaymentGatewayScreen> {
+  final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+  
+  // Controllers for form fields
+  final TextEditingController _cardNumberController = TextEditingController();
+  final TextEditingController _expiryDateController = TextEditingController();
+  final TextEditingController _cardHolderNameController = TextEditingController();
+  final TextEditingController _cvvController = TextEditingController();
+  
+  bool isProcessing = false;
+  String? errorMessage;
+
+  // Format card number with spaces
+  String _formatCardNumber(String input) {
+    input = input.replaceAll(' ', '');
+    final buffer = StringBuffer();
+    
+    for (int i = 0; i < input.length; i++) {
+      buffer.write(input[i]);
+      if ((i + 1) % 4 == 0 && i != input.length - 1) {
+        buffer.write(' ');
+      }
+    }
+    
+    return buffer.toString();
+  }
+
+  // Format expiry date with slash
+  String _formatExpiryDate(String input) {
+    input = input.replaceAll('/', '');
+    if (input.length > 2) {
+      return '${input.substring(0, 2)}/${input.substring(2)}';
+    }
+    return input;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Add listeners to format input as user types
+    _cardNumberController.addListener(() {
+      final text = _cardNumberController.text;
+      _cardNumberController.value = _cardNumberController.value.copyWith(
+        text: _formatCardNumber(text),
+        selection: TextSelection.collapsed(offset: _formatCardNumber(text).length),
+      );
+    });
+    
+    _expiryDateController.addListener(() {
+      final text = _expiryDateController.text;
+      _expiryDateController.value = _expiryDateController.value.copyWith(
+        text: _formatExpiryDate(text),
+        selection: TextSelection.collapsed(offset: _formatExpiryDate(text).length),
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _cardNumberController.dispose();
+    _expiryDateController.dispose();
+    _cardHolderNameController.dispose();
+    _cvvController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _processPayment() async {
+    if (!formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      isProcessing = true;
+      errorMessage = null;
+    });
+
+    try {
+      // Simulate payment processing
+      await Future.delayed(const Duration(seconds: 2));
+      
+      // In a real app, you would integrate with your payment gateway here
+      // For demo purposes, we'll simulate a successful payment
+      await supabase.from('tbl_salary').insert({
+        'worker_id': widget.workerId,
+        'salary_date': DateTime.now().toIso8601String(),
+        'salary_amount': widget.amount,
+        'salary_status': 1,
+      });
+
+      widget.onPaymentSuccess();
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Payment successful')),
+      );
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Payment failed: $e';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Payment failed: $e')),
+      );
+    } finally {
+      setState(() {
+        isProcessing = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currencyFormatter = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
+    
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: const Text(
+          'Payment Gateway',
+          style: TextStyle(
+            color: Color(0xFF333333),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.4,
+            padding: const EdgeInsets.all(24),
+            child: Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Payment Header
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE3F2FD),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.payment_rounded,
+                            color: Color(0xFF1976D2),
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Salary Payment',
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF333333),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'For ${widget.workerName}',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Color(0xFF666666),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Amount Display
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFAED581), width: 1),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Amount to Pay:',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF2E7D32),
+                            ),
+                          ),
+                          Text(
+                            currencyFormatter.format(widget.amount),
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2E7D32),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 32),
+                    
+                    // Payment Form
+                    Form(
+                      key: formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Card Details',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF333333),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          
+                          // Card Number Field
+                          TextFormField(
+                            controller: _cardNumberController,
+                            decoration: InputDecoration(
+                              labelText: 'Card Number',
+                              hintText: '1234 5678 9012 3456',
+                              prefixIcon: const Icon(Icons.credit_card, color: Color(0xFF666666)),
+                              filled: true,
+                              fillColor: Colors.white,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey[300]!),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey[300]!),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: Color(0xFF1976D2), width: 2),
+                              ),
+                            ),
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(19),
+                            ],
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter card number';
+                              }
+                              
+                              final cardNumber = value.replaceAll(' ', '');
+                              if (cardNumber.length < 16) {
+                                return 'Card number must be 16 digits';
+                              }
+                              
+                              // Luhn algorithm validation could be added here
+                              
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          
+                          // Card Holder Name
+                          TextFormField(
+                            controller: _cardHolderNameController,
+                            decoration: InputDecoration(
+                              labelText: 'Card Holder Name',
+                              hintText: 'John Doe',
+                              prefixIcon: const Icon(Icons.person, color: Color(0xFF666666)),
+                              filled: true,
+                              fillColor: Colors.white,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey[300]!),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey[300]!),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: Color(0xFF1976D2), width: 2),
+                              ),
+                            ),
+                            textCapitalization: TextCapitalization.words,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter card holder name';
+                              }
+                              if (value.length < 3) {
+                                return 'Name is too short';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          
+                          // Expiry Date and CVV
+                          Row(
+                            children: [
+                              // Expiry Date
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _expiryDateController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Expiry Date',
+                                    hintText: 'MM/YY',
+                                    prefixIcon: const Icon(Icons.calendar_today, color: Color(0xFF666666)),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: Colors.grey[300]!),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: Colors.grey[300]!),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(color: Color(0xFF1976D2), width: 2),
+                                    ),
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    LengthLimitingTextInputFormatter(4),
+                                  ],
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Required';
+                                    }
+                                    
+                                    final cleanValue = value.replaceAll('/', '');
+                                    if (cleanValue.length < 4) {
+                                      return 'Invalid format';
+                                    }
+                                    
+                                    final month = int.tryParse(cleanValue.substring(0, 2)) ?? 0;
+                                    final year = int.tryParse(cleanValue.substring(2, 4)) ?? 0;
+                                    
+                                    if (month < 1 || month > 12) {
+                                      return 'Invalid month';
+                                    }
+                                    
+                                    final now = DateTime.now();
+                                    final currentYear = now.year % 100;
+                                    final currentMonth = now.month;
+                                    
+                                    if (year < currentYear || (year == currentYear && month < currentMonth)) {
+                                      return 'Card expired';
+                                    }
+                                    
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              
+                              // CVV
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _cvvController,
+                                  decoration: InputDecoration(
+                                    labelText: 'CVV',
+                                    hintText: '123',
+                                    prefixIcon: const Icon(Icons.lock, color: Color(0xFF666666)),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: Colors.grey[300]!),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: Colors.grey[300]!),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(color: Color(0xFF1976D2), width: 2),
+                                    ),
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    LengthLimitingTextInputFormatter(4),
+                                  ],
+                                  obscureText: true,
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Required';
+                                    }
+                                    if (value.length < 3 || value.length > 4) {
+                                      return 'Invalid CVV';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 32),
+                    
+                    // Error Message
+                    if (errorMessage != null)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFEBEE),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFEF9A9A)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline, color: Colors.red),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                errorMessage!,
+                                style: const TextStyle(color: Colors.red),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    
+                    const SizedBox(height: 32),
+                    
+                    // Payment Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: isProcessing ? null : _processPayment,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1976D2),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 2,
+                        ),
+                        child: isProcessing
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text(
+                                'Pay Now',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Security Notice
+                    Center(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.lock, size: 16, color: Color(0xFF666666)),
+                          SizedBox(width: 8),
+                          Text(
+                            'Secure Payment',
+                            style: TextStyle(
+                              color: Color(0xFF666666),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 class RegistrationDialog extends StatefulWidget {
   final List<Map<String, dynamic>> typelist;
   final VoidCallback onRegisterSuccess;
@@ -483,7 +1179,6 @@ class _RegistrationDialogState extends State<RegistrationDialog> {
   String _selectedType = "";
   bool isRegistering = false;
 
-  // Handle image picking
   Future<void> handleImagePick() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
@@ -504,7 +1199,6 @@ class _RegistrationDialogState extends State<RegistrationDialog> {
     }
   }
 
-  // Upload image to Supabase storage
   Future<String?> photoUpload(String uid) async {
     if (pickedImage == null || pickedImage!.bytes == null) return null;
 
@@ -521,7 +1215,6 @@ class _RegistrationDialogState extends State<RegistrationDialog> {
     }
   }
 
-  // Register worker
   Future<void> register() async {
     try {
       final name = nameController.text;
@@ -531,7 +1224,6 @@ class _RegistrationDialogState extends State<RegistrationDialog> {
       final type = _selectedType;
       final cpassword = cpasswordController.text;
 
-      // Input validation
       if (name.isEmpty ||
           email.isEmpty ||
           contact.isEmpty ||
@@ -571,17 +1263,14 @@ class _RegistrationDialogState extends State<RegistrationDialog> {
         isRegistering = true;
       });
 
-      // Sign up with Supabase auth
       final auth = await supabase.auth.signUp(
         password: passwordController.text,
         email: emailController.text,
       );
       String uid = auth.user!.id;
 
-      // Upload photo and get URL
       String? profileImageUrl = await photoUpload(uid);
 
-      // Insert worker data
       await supabase.from("tbl_worker").insert({
         "id": uid,
         "worker_name": name,
@@ -592,10 +1281,8 @@ class _RegistrationDialogState extends State<RegistrationDialog> {
         "worker_photo": profileImageUrl,
       });
 
-      // Close dialog
       Navigator.of(context).pop();
 
-      // Refresh worker list
       widget.onRegisterSuccess();
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -621,7 +1308,6 @@ class _RegistrationDialogState extends State<RegistrationDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Profile Photo Upload
             GestureDetector(
               onTap: handleImagePick,
               child: CircleAvatar(
@@ -644,8 +1330,6 @@ class _RegistrationDialogState extends State<RegistrationDialog> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Name Field
             TextFormField(
               controller: nameController,
               style: const TextStyle(color: Color(0xFF333333)),
@@ -664,8 +1348,6 @@ class _RegistrationDialogState extends State<RegistrationDialog> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Email Field
             TextFormField(
               controller: emailController,
               keyboardType: TextInputType.emailAddress,
@@ -685,8 +1367,6 @@ class _RegistrationDialogState extends State<RegistrationDialog> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Contact Field
             TextFormField(
               controller: contactController,
               keyboardType: TextInputType.phone,
@@ -706,8 +1386,6 @@ class _RegistrationDialogState extends State<RegistrationDialog> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Skill Type Dropdown
             DropdownButtonFormField(
               style: const TextStyle(color: Color(0xFF333333)),
               decoration: const InputDecoration(
@@ -735,8 +1413,6 @@ class _RegistrationDialogState extends State<RegistrationDialog> {
               },
             ),
             const SizedBox(height: 16),
-
-            // Password Field
             TextFormField(
               controller: passwordController,
               style: const TextStyle(color: Color(0xFF333333)),
@@ -768,8 +1444,6 @@ class _RegistrationDialogState extends State<RegistrationDialog> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Confirm Password Field
             TextFormField(
               controller: cpasswordController,
               style: const TextStyle(color: Color(0xFF333333)),
@@ -801,8 +1475,6 @@ class _RegistrationDialogState extends State<RegistrationDialog> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // Register Button
             ElevatedButton(
               onPressed: isRegistering ? null : register,
               style: ElevatedButton.styleFrom(
